@@ -1,4 +1,4 @@
-;mmm
+; Practica 3 #MASM#
 ;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::        
 ;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 ; ||------------------------------------------------------------------------------------||
@@ -22,7 +22,7 @@ ENDM
 ; ||                                   Salir                                            ||
 ; ||------------------------------------------------------------------------------------||
 salir MACRO
-    mov ax, 4c00h	;Function (Quit with exit code (EXIT))
+    mov ah, 4ch	;Function (Quit with exit code (EXIT))
     int 21h			;Interruption DOS Functions
 ENDM
 ; ||------------------------------------------------------------------------------------||
@@ -31,6 +31,13 @@ ENDM
 mostrarEncabezado MACRO
     imprimir encabezado
     imprimir encabezado1
+ENDM
+; ||------------------------------------------------------------------------------------||
+; ||                                   Contar caracteres                                ||
+; ||------------------------------------------------------------------------------------||
+contarCaracteres MACRO
+    
+    ret
 ENDM
 ; ||------------------------------------------------------------------------------------||
 ; ||                                   Menu principal                                   ||
@@ -53,7 +60,7 @@ menuPrincipal MACRO
 
     ; Verificando opción elegida
     cmp menuOpcion[si],"1"
-    jz esIgual1
+    je esIgual1
 
     cmp menuOpcion[si],"2"
     jz esIgual2
@@ -71,93 +78,216 @@ menuPrincipal MACRO
 esIgual1:
     imprimir menuCargar        
     imprimir opcion1
-    cargarArchivo    
+    cargarArchivo  
 
 esIgual2:
     imprimir menuCrear
-    imprimir opcion2
+    imprimir opcion2    
     salir
 
 esIgual3:
     imprimir menuResultados
-    imprimir opcion3        
+    imprimir opcion3
+    ;................ Inician funciones ....................
+    ; imprimir strToLowerCase1
+    toLowerCase
     salir
 
 esIgual4:
     imprimir menuSalir
     imprimir opcion4
+    ; imprimir contenidoArchivo
     salir
     
 ; noEsIgual:
 ;     imprimir opcionIncorrecta
 ;     salir
-
 ENDM
 ; ||------------------------------------------------------------------------------------||
 ; ||                                   Cargar archivo                                   ||
-; ||------------------------------------------------------------------------------------||
-    
-; __________________________________ Ingresar nombre archivo __________________________________
+; ||------------------------------------------------------------------------------------||   
 cargarArchivo MACRO
-    ;nombreArchivoo proc
-        ; ; Leyendo ruta ingresada
-        ; mov ah, 3fh
-        ; mov bx, 00
-        ; mov cx, 100
-        ; mov dx, offset [nombreArchivo]
-        ; int 21h
-        ; ; Mostrando ruta ingresada
-        ; mov ah, 09h
-        ; lea dx, strRuta
-        ; int 21h
-        ; lea dx, nombreArchivo
-        ; int 21h
-    ;nombreArchivoo endp
-    
-; __________________________________ Leer archivo __________________________________
-    ;pusha
-    mov ah, 3dh         ; Abre el archivo
-    mov al, 00           ; Abre para leer
-    lea dx, nombreArchivo
-    int 21h
-    ;jc malaLectura
-    mov [archivoM], ax
-    xor si,si
-
-    imprimir strRuta
-    imprimir nombreArchivo
-    
-
-    mov ah, 3fh         ; Lee contenido del archivo
-    lea dx, textoBF     ; (Buffer) contenido del archivo | Muestra contenido
-    mov cx, 40          ; Leer 1 Byte
-    mov bx, archivoM  ; Valor del handle
-    int 21h
-    ;cmp ax, 0
-    ;jz finArchivo
-    ;jc malaLectura
-
-    mov bx, [archivoM]
-    mov ah, 3eh          ; Cerrar archivo
-    int 21h
-
-    imprimir strContenido
-    imprimir textoBF
-    imprimir saltoret
-
+    call rutaArchivo
+    call abrirArchivo    
+    call leerArchivo
+    call cerrarArchivo
     call main
+; __________________________________ Ingresar nombre archivo __________________________________
+    rutaArchivo proc
+        lea si, nombreArchivo
+        mov ah, 01h         ; Entrada de caracter
+
+        entradaTeclado:
+            int 21h
+
+            cmp al,0dh      ; Enter
+            je zeroTerm
+
+            mov [si],al
+            inc si
+
+            jmp entradaTeclado
+
+        zeroTerm:
+            mov byte ptr [si],0
+
+    rutaArchivo endp    
+; __________________________________ Abrir archivo __________________________________
+    abrirArchivo proc near
+        lea dx, nombreArchivo
+        mov al, 0           ; Abre para lectura
+        mov ah, 3dh         ; Abre el archivo        
+        int 21h
+
+        ; jc malaLectura
+
+        mov handlerArchivo, ax
+
+        ; xor si,si
+        lea si, contenidoArchivo
+
+        ; malaLectura:
+        ;     imprimir errorCargaNoExiste
+        ;     imprimir errorEligeOtro
+        ;     ret
+        
+        ret
+    abrirArchivo endp
+; __________________________________ Leer archivo __________________________________
+    leerArchivo proc near
+
+        leerLinea:
+            mov ah, 3fh         ; Lee contenido del archivo
+            mov bx, handlerArchivo    ; Valor del handle
+            lea dx, CharBF     ; (Buffer) contenido del archivo | Muestra contenido
+            mov cx, 1           ; Leer 1 Byte
+            int 21h             ; DOS Int
+            
+            jc malaLecturaVacio     ; Error
+
+            cmp ax, 0           ; 0 bytes leidos?
+            je finArchivo       ; SI -> Fin del archivo encontrado
+            
+            mov al, CharBF     ; No, carga el caracter
+            cmp al, 0ah         ; LF
+            je LF               ; SI -> LF
+            cmp al, 40h         ; Es una @
+            jz malaLecturaArroba     ; Error
+            cmp al, 60h         ; Es una ´
+            jz malaLecturaTilde     ; Error
+
+            mov [si],al
+            inc si
+            
+            jmp leerLinea     ; Repite...
+
+        finArchivo:
+            lea dx,contenidoArchivo   ; DX=offset(dirección) del texto
+            mov ah,40h          ; Imprime
+            mov cx,si           ; CX = # de caracteres, Mueve el apuntador al ultimo caracter
+            sub cx,dx           ; Resta el offset del texto (en DX) de CX
+                                ; Para obtener el numero actual de caracteres en el buffer
+            mov bx,1
+            int 21h
+
+            ; mov ah, 4ch
+            ; int 21h    
+            ret
+        ; Guardar en el string 
+        LF:
+            lea dx, contenidoArchivo   ; DX=offset(dirección) del texto
+            mov ah,40h          ; Imprime
+            mov cx,si           ; CX = # de caracteres, Mueve el apuntador al ultimo caracter
+            sub cx,dx           ; Resta el offset del texto (en DX) de CX
+                                ; Para obtener el numero actual de caracteres en el buffer
+            mov bx,1
+            int 21h
+
+            mov si,dx           ; Empieza desde el inicio del buffer
+                                ; (DX=Inicio del buffer de texto)
+
+            ;.................Funciones.........................
+            ; toLowerCase
+            jmp leerLinea
+
+        ; Verificando errores
+        malaLecturaVacio:
+            imprimir errorCargaVacio
+            imprimir errorEligeOtro
+        malaLecturaArroba:
+            imprimir errorCargaArroba
+            imprimir errorEligeOtro
+        malaLecturaTilde:
+            imprimir errorCargaTilde
+            imprimir errorEligeOtro
+
+        ret
+    leerArchivo endp
+; __________________________________ Cerrar archivo __________________________________
+    cerrarArchivo proc near        
+        mov ah, 3eh          ; Cerrar archivo
+        mov bx, handlerArchivo
+        int 21h
+        ret
+    cerrarArchivo endp
+
     ret
-ENDM
-; ||------------------------------------------------------------------------------------||
-; ||                                   Guardar en arreglo                               ||
-; ||------------------------------------------------------------------------------------||
-guardarCadena MACRO
-    mov cx,5
-    mov si,0
-    mov bx, textoBF
 ENDM
 ;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::        
 ;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+;|||||||||||||||||||||||||||||||| FUNCIONES|||||||||||||||||||||||||||||||||||||||||||||||||
+; ||------------------------------------------------------------------------------------||
+; ||                                   toLowerCase                                       ||
+; ||------------------------------------------------------------------------------------||
+toLowerCase MACRO
+call leer
+call main
+;....................................
+    ; mov [bx], offset CharBF
+    ; mov cx,4
+    
+    ; leer proc near       
+    ;     cmp [bx], word ptr 20h
+    ;     je e
+    ;     add [bx], word ptr 32
+
+    ;     e:
+    ;         mov dx,[bx]
+    ;         mov ah,02h
+    ;         int 21h
+    ;         inc bx
+
+    ;     finCadena:
+    ; ;         ret
+    ;     loop leer
+    ;     ret
+    ; leer endp
+;....................................
+    lea si,contenidoArchivo
+    mov si,0
+    leer:
+        cmp contenidoArchivo[si], 20h    ; MAY
+        je esMayuscula
+
+        mov ah,02h      ;Imprime caracter
+        int 21h
+        inc si
+        finCadena:
+            ret
+        esMayuscula:
+            add contenidoArchivo[si],32
+            ; mov dx,contenidoArchivo[si]
+            mov ah,02h
+            int 21h
+            inc si
+            ret
+        jmp leer
+;....................................
+ret
+ENDM
+;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::        
+;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
 .model large
 .stack 4096
 .data
@@ -190,17 +320,28 @@ menuOpcion          db      ?,10,13,"$"
 ; _________________________________ CARGAR ARCHIVO _________________________________ 
 menuCargar          db 13,10,13,10,"------------------ Cargar archivo -----------------",13,10,13,10,"$"
 opcion1             db      "Ingresa la ruta del archivo (con extension .arq).  ",13,10,13,10,"$"
-errorCarga1         db      "El archivo no existe.                              ",13,10,"$"
-errorCarga2         db      "Se encontro un caracter invalido.                  ",13,10,"$"
+errorCargaNoExiste  db      "El archivo no existe.                              ",13,10,"$"
+errorCargaVacio     db      "Archivo vacio.                              ",13,10,"$"
+errorCargaArroba    db      13,10,"Se encontro un caracter invalido: @                  ",13,10,"$"
+errorCargaTilde     db      13,10,"Se encontro un caracter invalido: Tilde              ",13,10,"$"
+errorEligeOtro      db      13,10,"Elige otro archivo.                                  ",13,10,"$"
 ;                   Variables para cargar archivo
 strRuta             db      10,13,"El archivo se llama:                        ","$"
 strContenido        db      10,13,"Contenido:                                  ",13,10,13,10,"$"
-nombreArchivo       db      "a.arq", "$";32 dup(0),0
-textoBF             dw      ?
-archivoM            dw      ?
-; _________________________________ ALMACENAR ARCHIVO _________________________________ 
-arrayCadena         dw      ?
-ttlNumbers          db      "Numeross                                          ",13,10,"$"
+;................................ Ruta Archivo ................................................
+; nombreArchivo       db      "may.arq", 0;
+; nombreArchivo       db      80 dup(0)
+nombreArchivo       db      255 dup(0)
+; nombreArchivo       db      ?
+;...........................................................................................
+CharBF              db      ?,"$"
+handlerArchivo      dw      ?,"$"
+contenidoArchivo          db      255 dup(0),"$"
+; _________________________________ FUNCIONES _________________________________ 
+; contadorLineas      db      0
+;................................ toLowerCase ................................................
+; strToLowerCase      db      ?
+strToLowerCase1     db      "To Lower Case:                                         ",13,10,13,10,"$"
 
 ; _________________________________ CREAR REPORTE _________________________________ 
 menuCrear         db 13,10,13,10,"------------------ Crear reporte -----------------",13,10,13,10,"$"
@@ -212,6 +353,7 @@ opcion3             db      "Los resultados, respecto a los datos son:          
 menuSalir          db 13,10,13,10,"--------------------- Salir ---------------------",13,10,13,10,"$"
 opcion4             db      "Abandonando el programa, hasta pronto.             ",13,10,"$"
 opcionIncorrecta    db      "Elige una opcion correcta.                         ",13,10,"$"
+;...........................................................................................
 
 ;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::        
 ;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
