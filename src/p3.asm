@@ -2,21 +2,56 @@
 ;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::        
 ;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 ; ||------------------------------------------------------------------------------------||
+; ||                                   Copiar                                         ||
+; ||------------------------------------------------------------------------------------||
+copiar MACRO cadena, destino
+    ; xor di,di
+    ; xor bl,bl
+    local copiarL
+    mov di,0
+
+    copiarL:
+        mov bl,cadena[di]
+        mov destino[di], bl
+        inc di
+        cmp cadena[di],"$"
+        jne copiarL
+ENDM
+; ||------------------------------------------------------------------------------------||
+; ||                                   Tamaño cadena                                    ||
+; ||------------------------------------------------------------------------------------||
+tamanoCadena MACRO cadena
+    local forTamano, finCadena
+    mov si,0
+    forTamano:
+        cmp cadena[si],"$"
+        je finCadena
+        inc si
+        jmp forTamano
+    finCadena:
+        ret
+ENDM
+; ||------------------------------------------------------------------------------------||
 ; ||                                   Imprimir                                         ||
 ; ||------------------------------------------------------------------------------------||
 imprimir MACRO cadena
+    xor dx,dx
+    xor ax,ax
     mov ah,09
     lea dx,cadena
     int 21h
+    xor dx,dx
+    xor ax,ax
 ENDM
 ; ||------------------------------------------------------------------------------------||
 ; ||                                   Limpia pantalla                                  ||
 ; ||------------------------------------------------------------------------------------||
 limpiarPantalla MACRO
-    mov ah, 06h
-    mov al, 3
+    xor ax,ax
+    mov ah, 03h
     int 10h
-    ret
+    xor ax,ax
+    ; ret
 ENDM
 ; ||------------------------------------------------------------------------------------||
 ; ||                                   Salir                                            ||
@@ -45,6 +80,7 @@ ENDM
 mostrarMenu MACRO
     imprimir encebazadoM0
     imprimir menu
+    imprimir menuF
     imprimir menuElige
 ENDM
 menuPrincipal MACRO
@@ -73,6 +109,20 @@ menuPrincipal MACRO
     cmp menuOpcion[si],"4"
     jz esIgual4
     
+    cmp menuOpcion[si],"5"
+    jz esIgual5
+    
+    cmp menuOpcion[si],"6"
+    jz esIgual6
+
+    cmp menuOpcion[si],"7"
+    jz esIgual7
+
+    cmp menuOpcion[si],"8"
+    jz esIgual8
+
+    cmp menuOpcion[si],"9"
+    jz esIgual9
 
 ; __________________________________ IFs de menu __________________________________
 esIgual1:
@@ -82,15 +132,13 @@ esIgual1:
 
 esIgual2:
     imprimir menuCrear
-    imprimir opcion2    
+    imprimir opcion2
+    guardarReporte
     salir
 
 esIgual3:
     imprimir menuResultados
     imprimir opcion3
-    ;................ Inician funciones ....................
-    ; imprimir strToLowerCase1
-    toLowerCase
     salir
 
 esIgual4:
@@ -98,11 +146,35 @@ esIgual4:
     imprimir opcion4
     ; imprimir contenidoArchivo
     salir
+
+;................ Inician funciones ....................
+esIgual5:
+    limpiarPantalla
+    toLowerCase
+    ; salir
     
+esIgual6:
+    limpiarPantalla
+    toUpperCase
+    ; salir
+
+esIgual7:
+    limpiarPantalla
+    imprimir contenidoArchivo
+
+esIgual8:
+    salir
+
+esIgual9:
+    limpiarPantalla
+    reverseString
+
 ; noEsIgual:
 ;     imprimir opcionIncorrecta
 ;     salir
+
 ENDM
+
 ; ||------------------------------------------------------------------------------------||
 ; ||                                   Cargar archivo                                   ||
 ; ||------------------------------------------------------------------------------------||   
@@ -112,7 +184,7 @@ cargarArchivo MACRO
     call leerArchivo
     call cerrarArchivo
     call main
-; __________________________________ Ingresar nombre archivo __________________________________
+; __________________________________ Ingresar nombreArchivo __________________________________
     rutaArchivo proc
         lea si, nombreArchivo
         mov ah, 01h         ; Entrada de caracter
@@ -158,7 +230,7 @@ cargarArchivo MACRO
 
         leerLinea:
             mov ah, 3fh         ; Lee contenido del archivo
-            mov bx, handlerArchivo    ; Valor del handle
+            mov bx, handlerArchivo    ; Valor del handlerArchivo
             lea dx, CharBF     ; (Buffer) contenido del archivo | Muestra contenido
             mov cx, 1           ; Leer 1 Byte
             int 21h             ; DOS Int
@@ -166,11 +238,13 @@ cargarArchivo MACRO
             jc malaLecturaVacio     ; Error
 
             cmp ax, 0           ; 0 bytes leidos?
-            je finArchivo       ; SI -> Fin del archivo encontrado
-            
+            je finArchivo       ; SI -> Fin del archivo encontrado        
+
             mov al, CharBF     ; No, carga el caracter
-            cmp al, 0ah         ; LF
-            je LF               ; SI -> LF
+            ; cmp al, 0ah         ; LF
+            ; je LF               ; SI -> LF
+            cmp al, '$'
+            je finArchivo
             cmp al, 40h         ; Es una @
             jz malaLecturaArroba     ; Error
             cmp al, 60h         ; Es una ´
@@ -190,6 +264,10 @@ cargarArchivo MACRO
             mov bx,1
             int 21h
 
+             ;.................Funciones.........................
+            ;  toLowerCase
+            ;  toUpperCase
+
             ; mov ah, 4ch
             ; int 21h    
             ret
@@ -200,14 +278,16 @@ cargarArchivo MACRO
             mov cx,si           ; CX = # de caracteres, Mueve el apuntador al ultimo caracter
             sub cx,dx           ; Resta el offset del texto (en DX) de CX
                                 ; Para obtener el numero actual de caracteres en el buffer
-            mov bx,1
+            ; mov bx,1
             int 21h
+
+           
 
             mov si,dx           ; Empieza desde el inicio del buffer
                                 ; (DX=Inicio del buffer de texto)
 
-            ;.................Funciones.........................
-            ; toLowerCase
+            ; ;.................Funciones.........................
+            ;  toLowerCase
             jmp leerLinea
 
         ; Verificando errores
@@ -233,61 +313,193 @@ cargarArchivo MACRO
 
     ret
 ENDM
-;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::        
-;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-;|||||||||||||||||||||||||||||||| FUNCIONES|||||||||||||||||||||||||||||||||||||||||||||||||
 ; ||------------------------------------------------------------------------------------||
-; ||                                   toLowerCase                                       ||
+; ||                                   Guardar reporte                                  ||
 ; ||------------------------------------------------------------------------------------||
-toLowerCase MACRO
-call leer
-call main
-;....................................
-    ; mov [bx], offset CharBF
-    ; mov cx,4
-    
-    ; leer proc near       
-    ;     cmp [bx], word ptr 20h
-    ;     je e
-    ;     add [bx], word ptr 32
+guardarReporte MACRO ;, contenidoToUpperCase, contenidoToString
+; Etiquetas
+local escribirReporteL
 
-    ;     e:
-    ;         mov dx,[bx]
-    ;         mov ah,02h
-    ;         int 21h
-    ;         inc bx
-
-    ;     finCadena:
-    ; ;         ret
-    ;     loop leer
-    ;     ret
-    ; leer endp
-;....................................
-    lea si,contenidoArchivo
-    mov si,0
-    leer:
-        cmp contenidoArchivo[si], 20h    ; MAY
-        je esMayuscula
-
-        mov ah,02h      ;Imprime caracter
+call crearReporte
+; call abrirReporte
+call escribirReporte
+call cerrarReporte
+; ____________________________________ Crear reporte ____________________________________
+    crearReporte proc near
+        mov ah,3ch      ; Crear archivo
+        mov cx, 00h       
+        lea dx, offset nombreReporte
         int 21h
-        inc si
-        finCadena:
-            ret
-        esMayuscula:
-            add contenidoArchivo[si],32
-            ; mov dx,contenidoArchivo[si]
-            mov ah,02h
+        ret
+        mov handlerReporte,ax
+    crearReporte endp
+; __________________________________ Abrir reporte __________________________________
+    ; abrirReporte proc near
+    ;     lea dx, nombreReporte
+    ;     mov al, 010b           ; Abre para lectura
+    ;     mov ah, 3dh         ; Abre el archivo        
+    ;     int 21h
+
+    ;     ; jc malaLectura
+
+    ;     mov handlerReporte, ax
+
+    ;     ; xor si,si
+    ;     lea si, contenidoArchivo
+
+    ;     ; malaLectura:
+    ;     ;     imprimir errorCargaNoExiste
+    ;     ;     imprimir errorEligeOtro
+    ;     ;     ret
+        
+    ;     ret
+    ; abrirReporte endp
+
+; ____________________________________ Escribir reporte ____________________________________
+    escribirReporte proc near
+        ; mov cx, 1000
+        
+            ; push cx
+            mov ah,40h
+            mov bx,handlerReporte
+            lea dx, contenidoArchivo
+            tamanoCadena contenidoArchivo
+            mov cx,si
             int 21h
-            inc si
-            ret
-        jmp leer
-;....................................
+
+    escribirReporte endp
+; __________________________________ Cerrar reporte __________________________________
+    cerrarReporte proc near        
+        mov ah, 3eh          ; Cerrar archivo
+        mov bx, handlerReporte
+        int 21h
+        ret
+    cerrarReporte endp
 ret
 ENDM
 ;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::        
 ;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+;|||||||||||||||||||||||||||||||| FUNCIONES|||||||||||||||||||||||||||||||||||||||||||||||||
+; ||------------------------------------------------------------------------------------||
+; ||                                   toLowerCase                                      ||
+; ||------------------------------------------------------------------------------------||
+toLowerCase MACRO
+local finCadena, leerC, ok
+call tolwr
+; call main
 
+copiar contenidoArchivo,strToLowerCaseContenido
+
+tolwr proc near
+    imprimir strToLowerCase
+
+        xor bx,bx
+        lea bx, strToLowerCaseContenido
+        
+        leerC:
+            cmp byte ptr[bx],'$'
+            je finCadena
+            cmp byte ptr[bx],'A'
+            jb ok
+            cmp byte ptr[bx],'Z'
+            ja ok
+            add byte ptr[bx],20h
+            
+            ok:
+                inc bx
+                jmp leerC
+            finCadena:
+                imprimir strToLowerCaseContenido
+                ret
+    ret 
+tolwr endp
+
+ret
+ENDM
+; ||------------------------------------------------------------------------------------||
+; ||                                   toUpperCase                                      ||
+; ||------------------------------------------------------------------------------------||
+toUpperCase MACRO
+local finCadena, leerC, ok
+call toupr
+; call main
+
+copiar contenidoArchivo,strToUpperCaseContenido
+
+toupr proc near
+    imprimir strToUpperCase
+
+        xor bx,bx
+        lea bx, strToUpperCaseContenido
+        
+        leerC:
+            cmp byte ptr[bx],'$'
+            je finCadena
+            cmp byte ptr[bx],'a'
+            jb ok
+            cmp byte ptr[bx],'z'
+            ja ok
+            sub byte ptr[bx],20h
+            
+            ok:
+                inc bx
+                jmp leerC
+            finCadena:
+                imprimir strToUpperCaseContenido
+                ret
+    ret
+toupr endp
+
+ret
+ENDM
+; ||------------------------------------------------------------------------------------||
+; ||                                   toString
+; ||------------------------------------------------------------------------------------||
+toString MACRO
+    copiar contenidoArchivo,strToString
+ENDM
+; ||------------------------------------------------------------------------------------||
+; ||                                   reverseString                                    ||
+; ||------------------------------------------------------------------------------------||
+reverseString MACRO
+local leerC, leerC2, vacio
+call rvrs
+; call main
+
+copiar contenidoArchivo,strReverseStringContenido
+; xor si, si
+; xor di, di
+rvrs proc near
+    imprimir strReverseString
+            lea si, strReverseStringContenido
+            mov cl, [si+1]
+            mov ch,0
+            add si, cx
+            inc si
+            lea di, strReverseStringContenido2
+            jcxz vacio
+        ; leerC:
+        ;     inc si
+        ;     cmp byte ptr[si],"$"
+        ;     jne leerC
+
+        ;     dec si
+        ;     lea di,
+        
+        leerC2:
+            mov al, byte ptr[si]
+            mov byte ptr[di],al
+            dec si
+            inc di
+            loop leerC2
+
+        vacio:
+            imprimir strReverseStringContenido2
+    ret
+rvrs endp
+ENDM
+;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::        
+;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 .model large
 .stack 4096
 .data
@@ -314,6 +526,11 @@ menu                db      "1. Cargar archivo                                  
                             "2. Crear reporte                                   ",13,10,
                             "3. Mostrar Resultados                              ",13,10,
                             "4. Salir                                           ",13,10,
+                            "5. toLowerCase                                     ",13,10,"$"
+menuF               db      "6. toUpperCase                                     ",13,10,
+                            "7. toString                                        ",13,10,
+                            "8. concat                                          ",13,10,
+                            "9. reverseString                                   ",13,10,
                             "___________________________________________________",13,10,"$"
 menuElige           db      10,13,10,13,"Bienvenido, elige una opcion...      ",13,10,13,10,"$"
 menuOpcion          db      ?,10,13,"$"
@@ -336,16 +553,39 @@ nombreArchivo       db      255 dup(0)
 ;...........................................................................................
 CharBF              db      ?,"$"
 handlerArchivo      dw      ?,"$"
-contenidoArchivo          db      255 dup(0),"$"
+contenidoArchivo    db      1000 dup(0),"$"
+; contenidoArchivo    db      ?
 ; _________________________________ FUNCIONES _________________________________ 
 ; contadorLineas      db      0
 ;................................ toLowerCase ................................................
-; strToLowerCase      db      ?
-strToLowerCase1     db      "To Lower Case:                                         ",13,10,13,10,"$"
+strToLowerCase     db      "To Lower Case:                                         ",13,10,13,10,"$"
+strToLowerCaseContenido db  1000 dup(0),"$"
+;................................ toUpperCase ................................................
+strToUpperCase     db      "To Upper Case:                                         ",13,10,13,10,"$"
+strToUpperCaseContenido db  1000 dup(0),"$"
+;................................ toString ................................................
+strToString                 db      "To String",13,10,13,10,"$"
+strToStringContenido         db      1000 dup(0),"$"
+;................................ concat ................................................
+strConcat               db      "Concat",13,10,13,10,"$"
+strConcatContenido      db      1000 dup(0),"$"
+;................................ reverseString ................................................
+strReverseString              db      "reverse String                               ",13,10,"$"
+strReverseStringContenido      db      1000 dup(0),"$"
+strReverseStringContenido2      db      1000 dup(0),"$"
 
 ; _________________________________ CREAR REPORTE _________________________________ 
 menuCrear         db 13,10,13,10,"------------------ Crear reporte -----------------",13,10,13,10,"$"
 opcion2             db      "Se genero el reporte.                              ",13,10,"$"
+;....................................................................................
+nombreReporte       db      "reporte.json","$"
+handlerReporte      dw      ?
+;....................................................................................
+reprteFecha         db      ""
+reporteLlaveAbre    db      "{"
+reporteLlaveCierra    db      "}"
+reporteCorcheteAbre    db      "["
+reporteCorcheteCierra    db      "]"
 ; _________________________________ MOSTRAR RESULTADOS _________________________________ 
 menuResultados     db 13,10,13,10,"------------------- Resultados ------------------",13,10,13,10,"$"
 opcion3             db      "Los resultados, respecto a los datos son:          ",13,10,"$"
